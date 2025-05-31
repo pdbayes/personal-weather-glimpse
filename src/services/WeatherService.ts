@@ -13,7 +13,7 @@ interface WeatherData {
 export class WeatherService {
   private readonly STORAGE_KEY = 'weatherHistoricalData';
   private readonly MAX_RECORDS = 1008; // 7 days * 24 hours * 6 (10-minute intervals)
-  private readonly WEATHER_STATION_URL = 'http://192.168.1.131';
+  private readonly WEATHER_STATION_URL = '/api';
 
   constructor() {
     console.log('WeatherService initialized');
