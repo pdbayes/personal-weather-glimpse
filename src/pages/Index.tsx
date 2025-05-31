@@ -46,27 +46,40 @@ const Index = () => {
     
     try {
       console.log('Attempting to fetch data from weather station...');
-      const stationData = await weatherService.fetchFromWeatherStation();
+      // Returns { data: WeatherData, isMock: boolean } | null
+      const result = await weatherService.fetchFromWeatherStation();
       
-      if (stationData) {
-        console.log('Successfully received weather data:', stationData);
+      if (result) {
+        const stationData = result.data; // This is WeatherData
+        const isActuallyMock = result.isMock;
+
+        console.log('Successfully received weather data. Is mock:', isActuallyMock, stationData);
         setCurrentWeather(stationData);
+        // Assuming saveWeatherReading can handle the new isMockData field, or it's filtered before saving if needed
         weatherService.saveWeatherReading(stationData);
         setLastUpdate(new Date());
         
-        // Check if this is mock data (will have very recent timestamp and typical mock patterns)
-        const isMock = Math.abs(new Date().getTime() - new Date(stationData.timestamp!).getTime()) < 1000;
-        setUsingMockData(isMock);
+        setUsingMockData(isActuallyMock); // Use the flag from the service
         
         toast({
-          title: isMock ? "Using mock data" : "Weather data updated",
-          description: isMock 
+          title: isActuallyMock ? "Using mock data" : "Weather data updated",
+          description: isActuallyMock
             ? "Demo data generated for preview (real station at 192.168.1.131 not accessible)"
             : "Successfully fetched latest weather information from your station",
-          variant: isMock ? "default" : "default"
+          variant: "default" // Consider 'default' for mock too, or a less alarming variant if it's just for info
         });
       } else {
-        throw new Error('Failed to fetch data from weather station');
+        // This case implies fetchFromWeatherStation itself returned null,
+        // which means a more fundamental issue than just an error caught inside it that led to mock.
+        // The current WeatherService always returns an object or throws, then catches and returns an object.
+        // So, this 'else' might not be hit unless WeatherService.fetchFromWeatherStation is changed to return null directly.
+        // For now, we can assume 'result' will always be non-null if no exception is thrown from the call itself.
+        // If it could be null, we might need a specific toast here.
+        // Based on WeatherService changes, it should always return an object.
+        // The 'throw new Error' was inside the old 'if (stationData)'
+        // Let's adjust to what happens if result is null (though unlikely with current WeatherService)
+        console.error('Failed to fetch data: weatherService.fetchFromWeatherStation returned null');
+        throw new Error('Failed to fetch data from weather station (service returned null)');
       }
 
       // Fetch OpenWeatherMap data (you'll need to get an API key)
