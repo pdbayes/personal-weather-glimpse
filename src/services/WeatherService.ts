@@ -8,6 +8,12 @@ interface WeatherData {
   cloudBase: number;
   Rain: number;
   timestamp?: string;
+  isMockData?: boolean;
+}
+
+interface WeatherServiceResponse {
+  data: WeatherData;
+  isMock: boolean;
 }
 
 export class WeatherService {
@@ -131,12 +137,13 @@ export class WeatherService {
       dewPoint: Math.round((baseTemp - 2 - Math.random() * 3) * 100) / 100,
       cloudBase: Math.round((400 + Math.random() * 300) * 100) / 100,
       Rain: Math.random() > 0.8 ? Math.round(Math.random() * 5 * 100) / 100 : 0,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isMockData: true
     };
   }
 
   // Method to fetch data from your actual weather station
-  async fetchFromWeatherStation(): Promise<WeatherData | null> {
+  async fetchFromWeatherStation(): Promise<WeatherServiceResponse | null> {
     try {
       console.log(`Fetching data from weather station: ${this.WEATHER_STATION_URL}`);
       const response = await fetch(this.WEATHER_STATION_URL, {
@@ -165,10 +172,12 @@ export class WeatherService {
         console.log('Raw weather station data:', data);
 
         if (this.isValidWeatherData(data)) {
-          return {
+          const stationDataWithTimestamp: WeatherData = {
             ...data,
-            timestamp: new Date().toISOString()
+            timestamp: data.timestamp || new Date().toISOString(),
+            isMockData: false
           };
+          return { data: stationDataWithTimestamp, isMock: false };
         } else {
           console.error('Invalid weather data format received from station. Data:', data);
           throw new Error('Invalid weather data format received from station');
@@ -183,9 +192,8 @@ export class WeatherService {
     } catch (error) {
       console.error('Error fetching from weather station:', error);
       console.log('Falling back to mock data for preview/development');
-      
-      // Return mock data as fallback
-      return this.generateMockWeatherData();
+      const mockData = this.generateMockWeatherData();
+      return { data: mockData, isMock: true };
     }
   }
 
