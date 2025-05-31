@@ -35,6 +35,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [usingMockData, setUsingMockData] = useState(false);
   const { toast } = useToast();
 
   const weatherService = new WeatherService();
@@ -48,14 +49,21 @@ const Index = () => {
       const stationData = await weatherService.fetchFromWeatherStation();
       
       if (stationData) {
-        console.log('Successfully received weather station data:', stationData);
+        console.log('Successfully received weather data:', stationData);
         setCurrentWeather(stationData);
         weatherService.saveWeatherReading(stationData);
         setLastUpdate(new Date());
         
+        // Check if this is mock data (will have very recent timestamp and typical mock patterns)
+        const isMock = Math.abs(new Date().getTime() - new Date(stationData.timestamp!).getTime()) < 1000;
+        setUsingMockData(isMock);
+        
         toast({
-          title: "Weather data updated",
-          description: "Successfully fetched latest weather information from your station",
+          title: isMock ? "Using mock data" : "Weather data updated",
+          description: isMock 
+            ? "Demo data generated for preview (real station at 192.168.1.131 not accessible)"
+            : "Successfully fetched latest weather information from your station",
+          variant: isMock ? "default" : "default"
         });
       } else {
         throw new Error('Failed to fetch data from weather station');
@@ -71,7 +79,7 @@ const Index = () => {
       
       toast({
         title: "Connection Error",
-        description: `Failed to connect to weather station at http://192.168.1.131: ${errorMessage}`,
+        description: `Failed to connect to weather station: ${errorMessage}`,
         variant: "destructive",
       });
     }
@@ -125,6 +133,11 @@ const Index = () => {
             <div className="flex items-center gap-2">
               <Thermometer className="w-4 h-4" />
               <span>Weather Station (192.168.1.131)</span>
+              {usingMockData && (
+                <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs">
+                  Mock Data
+                </span>
+              )}
             </div>
             {lastUpdate && (
               <div className="flex items-center gap-2">
@@ -143,7 +156,16 @@ const Index = () => {
             </Button>
           </div>
           
-          {connectionError && (
+          {usingMockData && (
+            <div className="flex items-center justify-center gap-2 text-amber-700 bg-amber-50 px-4 py-2 rounded-lg border border-amber-200">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-sm">
+                Using demo data - Deploy to your local environment to connect to real weather station
+              </span>
+            </div>
+          )}
+          
+          {connectionError && !usingMockData && (
             <div className="flex items-center justify-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg border border-red-200">
               <AlertCircle className="w-4 h-4" />
               <span className="text-sm">Connection Error: {connectionError}</span>
@@ -166,7 +188,7 @@ const Index = () => {
             <div className="flex items-center justify-center h-64">
               <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
               <span className="ml-2 text-gray-600">
-                {connectionError ? 'Unable to load weather data...' : 'Loading weather data...'}
+                Loading weather data...
               </span>
             </div>
           )}
