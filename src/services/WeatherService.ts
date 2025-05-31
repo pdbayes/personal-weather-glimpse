@@ -141,24 +141,44 @@ export class WeatherService {
       console.log(`Fetching data from weather station: ${this.WEATHER_STATION_URL}`);
       const response = await fetch(this.WEATHER_STATION_URL, {
         method: 'GET',
-        timeout: 5000 // 5 second timeout
-      } as any);
+        // timeout: 5000 // Note: timeout is not a standard fetch option, consider AbortController if needed
+      } as RequestInit); // Use RequestInit for better typing, remove 'as any'
       
       if (!response.ok) {
+        // Log the response text for non-ok responses as well, as it might contain useful error info
+        const errorText = await response.text();
+        console.error(`HTTP error! status: ${response.status}, response text: ${errorText}`);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json();
-      console.log('Raw weather station data:', data);
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const responseText = await response.text();
+        console.error(`Expected application/json but got ${contentType}. Response text: ${responseText}`);
+        throw new Error(`Expected application/json but got ${contentType}`);
+      }
       
-      // Validate the data structure
-      if (this.isValidWeatherData(data)) {
-        return {
-          ...data,
-          timestamp: new Date().toISOString()
-        };
-      } else {
-        throw new Error('Invalid weather data format received from station');
+      // Clone the response before reading it as JSON, so we can read it as text if JSON parsing fails
+      const responseClone = response.clone();
+      try {
+        const data = await response.json();
+        console.log('Raw weather station data:', data);
+
+        if (this.isValidWeatherData(data)) {
+          return {
+            ...data,
+            timestamp: new Date().toISOString()
+          };
+        } else {
+          console.error('Invalid weather data format received from station. Data:', data);
+          throw new Error('Invalid weather data format received from station');
+        }
+      } catch (jsonError) {
+        console.error('Error parsing JSON response:', jsonError);
+        // Log the raw text of the response if JSON parsing failed
+        const responseText = await responseClone.text();
+        console.error('Raw response text that failed JSON parsing:', responseText);
+        throw jsonError; // Re-throw the jsonError to be caught by the outer catch
       }
     } catch (error) {
       console.error('Error fetching from weather station:', error);
