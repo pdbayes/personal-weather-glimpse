@@ -1,3 +1,4 @@
+
 interface WeatherData {
   temperature: number;
   humidity: number;
@@ -12,6 +13,7 @@ interface WeatherData {
 export class WeatherService {
   private readonly STORAGE_KEY = 'weatherHistoricalData';
   private readonly MAX_RECORDS = 1008; // 7 days * 24 hours * 6 (10-minute intervals)
+  private readonly WEATHER_STATION_URL = 'http://192.168.1.131';
 
   constructor() {
     console.log('WeatherService initialized');
@@ -116,19 +118,26 @@ export class WeatherService {
   }
 
   // Method to fetch data from your actual weather station
-  async fetchFromWeatherStation(endpoint: string): Promise<WeatherData | null> {
+  async fetchFromWeatherStation(): Promise<WeatherData | null> {
     try {
-      const response = await fetch(endpoint);
+      console.log(`Fetching data from weather station: ${this.WEATHER_STATION_URL}`);
+      const response = await fetch(this.WEATHER_STATION_URL);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
       const data = await response.json();
+      console.log('Raw weather station data:', data);
       
       // Validate the data structure
       if (this.isValidWeatherData(data)) {
-        return data;
+        return {
+          ...data,
+          timestamp: new Date().toISOString()
+        };
       } else {
-        throw new Error('Invalid weather data format');
+        throw new Error('Invalid weather data format received from station');
       }
     } catch (error) {
       console.error('Error fetching from weather station:', error);
@@ -139,6 +148,7 @@ export class WeatherService {
   private isValidWeatherData(data: any): data is WeatherData {
     return (
       typeof data === 'object' &&
+      data !== null &&
       typeof data.temperature === 'number' &&
       typeof data.humidity === 'number' &&
       typeof data.pressure === 'number' &&

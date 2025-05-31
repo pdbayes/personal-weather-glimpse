@@ -4,7 +4,7 @@ import { WeatherGauges } from '../components/WeatherGauges';
 import { WeatherCharts } from '../components/WeatherCharts';
 import { WeatherService } from '../services/WeatherService';
 import { Card } from '@/components/ui/card';
-import { RefreshCw, Thermometer, Droplets, Gauge, Wind } from 'lucide-react';
+import { RefreshCw, Thermometer, Droplets, Gauge, Wind, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 
@@ -34,42 +34,44 @@ const Index = () => {
   const [openWeatherData, setOpenWeatherData] = useState<OpenWeatherData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const weatherService = new WeatherService();
 
   const fetchWeatherData = async () => {
     setIsLoading(true);
+    setConnectionError(null);
+    
     try {
-      // Simulate fetching from your weather station
-      // Replace this URL with your actual weather station endpoint
-      const mockData: WeatherData = {
-        temperature: 16.37059 + (Math.random() - 0.5) * 4,
-        humidity: 93.12795 + (Math.random() - 0.5) * 10,
-        pressure: 1006.9 + (Math.random() - 0.5) * 20,
-        gas: 86.975 + (Math.random() - 0.5) * 10,
-        dewPoint: 15.25602 + (Math.random() - 0.5) * 3,
-        cloudBase: 545.8286 + (Math.random() - 0.5) * 100,
-        Rain: Math.random() > 0.8 ? Math.random() * 5 : 0,
-        timestamp: new Date().toISOString()
-      };
-
-      setCurrentWeather(mockData);
-      weatherService.saveWeatherReading(mockData);
-      setLastUpdate(new Date());
+      console.log('Attempting to fetch data from weather station...');
+      const stationData = await weatherService.fetchFromWeatherStation();
+      
+      if (stationData) {
+        console.log('Successfully received weather station data:', stationData);
+        setCurrentWeather(stationData);
+        weatherService.saveWeatherReading(stationData);
+        setLastUpdate(new Date());
+        
+        toast({
+          title: "Weather data updated",
+          description: "Successfully fetched latest weather information from your station",
+        });
+      } else {
+        throw new Error('Failed to fetch data from weather station');
+      }
 
       // Fetch OpenWeatherMap data (you'll need to get an API key)
       await fetchOpenWeatherData();
 
-      toast({
-        title: "Weather data updated",
-        description: "Successfully fetched latest weather information",
-      });
     } catch (error) {
       console.error('Error fetching weather data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setConnectionError(errorMessage);
+      
       toast({
-        title: "Error",
-        description: "Failed to fetch weather data",
+        title: "Connection Error",
+        description: `Failed to connect to weather station at http://192.168.1.131: ${errorMessage}`,
         variant: "destructive",
       });
     }
@@ -122,7 +124,7 @@ const Index = () => {
           <div className="flex items-center justify-center gap-4 text-sm text-gray-600">
             <div className="flex items-center gap-2">
               <Thermometer className="w-4 h-4" />
-              <span>Personal Weather Station</span>
+              <span>Weather Station (192.168.1.131)</span>
             </div>
             {lastUpdate && (
               <div className="flex items-center gap-2">
@@ -140,6 +142,13 @@ const Index = () => {
               Refresh
             </Button>
           </div>
+          
+          {connectionError && (
+            <div className="flex items-center justify-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg border border-red-200">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-sm">Connection Error: {connectionError}</span>
+            </div>
+          )}
         </div>
 
         {/* Current Conditions */}
@@ -156,7 +165,9 @@ const Index = () => {
           ) : (
             <div className="flex items-center justify-center h-64">
               <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-              <span className="ml-2 text-gray-600">Loading weather data...</span>
+              <span className="ml-2 text-gray-600">
+                {connectionError ? 'Unable to load weather data...' : 'Loading weather data...'}
+              </span>
             </div>
           )}
         </Card>
